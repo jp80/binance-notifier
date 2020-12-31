@@ -1,0 +1,5 @@
+{
+    "require": {
+        "larislackers/php-binance": "^1.0"
+    }
+}
