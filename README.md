@@ -16,3 +16,6 @@ TODO: Add a setup.sh to get dependencies. These are currently included in the re
 TODO: Add configuration and log files.
 
 TODO: Add trading features.
+
+
+If this is any use to you or you have any suggestions, please let me know. Would be interesting to see people fork this repo on GitHub so I can see where other people take it.
