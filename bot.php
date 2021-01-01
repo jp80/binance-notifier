@@ -88,8 +88,9 @@ while (true) {
 			}
 			if ($i == 5 || $i == 7 || $i == 9 || $i == 10) {
 			        // format volume fields
-				$val = substr($x[$i] / 1000, 0, 5);
-			        $add="K";
+				extract(formatVolume($x[$i]));
+//			        var_dump($t);
+//			        die();
 			}
 			if ($i == 0 || $i == 6) {
 			    // make times look pretty...
@@ -149,7 +150,8 @@ while (true) {
 		$out.= "Large Volume";
 	}
         // current status
-	echo ("Average volume ($closures): $vol_avg\n");
+	$volDisplay=formatVolume($vol_avg);
+	echo ("Average volume ($closures): " . $volDisplay['val'] . $volDisplay['add'] . "\n");
 	echo ("Current value: \$$curr_value\n");
 	if ($out) {
 	        // speak and print the alert text
@@ -163,6 +165,25 @@ while (true) {
 	sleep(1);
 // end of while(true) loop
 };
+
+// utility functions
+
+function formatVolume($text){
+	$add="";
+	if($text<1000000){
+		$val = substr($text / 1000, 0, 5);
+		$add="K";
+	} else if($text>999999){
+		$val = substr($text / 1000000, 0, 5);
+	       	$add="M";
+	} else {
+		$val=substr($text, 0,5);
+		$add="";
+	}
+	$r['val']=$val; $r['add']=$add;
+	return($r);
+}
+
 
 ?>
 
