@@ -170,16 +170,18 @@ while (true) {
 
 function formatVolume($text){
 	$add="";
-	if($text<1000000){
+
+        if($text<1000){
+	    	$val=substr($text, 0,5);
+		$add="";
+        } elseif($text<1000000){
 		$val = substr($text / 1000, 0, 5);
 		$add="K";
-	} else if($text>999999){
+	} elseif($text>999999){
 		$val = substr($text / 1000000, 0, 5);
 	       	$add="M";
-	} else {
-		$val=substr($text, 0,5);
-		$add="";
 	}
+    
 	$r['val']=$val; $r['add']=$add;
 	return($r);
 }
