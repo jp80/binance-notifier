@@ -1,4 +1,10 @@
-<?php namespace Larislackers\BinanceApi;
+<?php 
+
+//// (c) jp80 (jamie[at]txt3.com)
+//// See https://de.zyns.com for more information regarding this code and my other projects.
+
+namespace Larislackers\BinanceApi;
+
 $ans = chr(27) . "[";
 $fn[0] = "Open Time";
 $fn[1] = "Open";
