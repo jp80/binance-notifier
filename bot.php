@@ -1,3 +1,4 @@
+#!/usr/bin/php
 <?php 
 
 //// (c) jp80 (jamie[at]txt3.com)
@@ -59,21 +60,25 @@ while (true) {
 			$closures = count($volume_avg_array);
 		}
 		for ($i = 0;$i < count($x) - 1;$i++) {
+		        $add="";
+		        $val = $x[$i];
 			if ($i > 0 && $i < 5) {
-				$x[$i] = substr($x[$i], 0, 7);
+				$val = substr($x[$i], 0, 7);
 			}
 			if ($i == 5 || $i == 7 || $i == 9 || $i == 10) {
-				$x[$i] = substr($x[$i] / 1000, 0, 5) . "K";
+				$val = substr($x[$i] / 1000, 0, 5);
+			        $add="K";
 			}
 			if ($i == 0 || $i == 6) {
-				$x[$i] = gmdate("H:i:s", ceil($x[$i] / 1000));
+				$val = gmdate("H:i:s", ceil($x[$i] / 1000));
 			}
 			if (!$ci) {
-				echo (chr(27) . "[" . (4 + $i) . ";22H " . $x[$i] . "  ");
+				echo (chr(27) . "[" . (4 + $i) . ";22H " . $val . $add . "  ");
 			}
 			if ($ci) {
-				echo (chr(27) . "[" . (4 + $i) . ";63H " . $x[$i] . "  ");
+				echo (chr(27) . "[" . (4 + $i) . ";63H " . $val . $add . "  ");
 			}
+		        
 		};
 		echo ("\n");
 		$ci++;
