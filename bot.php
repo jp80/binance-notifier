@@ -6,7 +6,10 @@
 
 namespace Larislackers\BinanceApi;
 
+// ANSI escape sequence
 $ans = chr(27) . "[";
+
+// Headings for the Binance API responses
 $fn[0] = "Open Time";
 $fn[1] = "Open";
 $fn[2] = "High";
@@ -18,17 +21,31 @@ $fn[7] = "Quote Asset Vol.";
 $fn[8] = "No. Of Trades";
 $fn[9] = "Taker Buy Vol.";
 $fn[10] = "Taker buy quote vol.";
-passthru("clear");
+
+// clear the terminal
+echo($ans . "2J". $ans ."0;0H");
+
+// header text
 echo ("\n" . str_pad("Last Candle", 41) . "Current Candle\n" . str_repeat("-", 78));
+
+// populate field names
 for ($j = 0;$j < 11;$j++) {
 	$i = $j + 4;
 	echo ($ans . $i . ";0H" . str_pad($fn[$j], 20) . ":" . $ans . $i . ";42H" . str_pad($fn[$j], 20) . ":\n");
 }
+
+// draw a line under the fields
 echo ($ans . "15;0H" . str_repeat("-", 78));
+
+// we need this
 require ('vendor/autoload.php');
+
+// parse credentials file
 $creds = explode(":", file_get_contents('./binance.api'));
+
+// fire up an instance of the php binance api
 $bac = new BinanceApiContainer($creds[0], $creds[1]);
-#$orders = $bac -> getOrderBook(['symbol' => 'XRPUSDT']);
+
 // set this to a higher number to flatten out the average over a longer time
 $lookback_average_mins = 5;
 // current iteration ( for looping over the last 2 mins of data from exchange)
@@ -43,11 +60,14 @@ $volume_avg_array = array();
 $vol_avg = 0;
 // last cent value (rounded down to two decimal places
 $curr_value = 0;
+// do this forever...
 while (true) {
-	//        echo(chr(27)."[2J".chr(27)."[0H");
+        // current item - 0 = prev candle, 1 = curr candle
 	$ci = 0;
+        // get the candle data from binance
 	$orders = $bac->getKlines(['symbol' => 'XRPUSDT', 'interval' => '1m', 'limit' => '2']);
-	foreach (json_Decode($orders->getBody()->getContents()) as $x) {
+        // parse candle data
+        foreach (json_Decode($orders->getBody()->getContents()) as $x) {
 		if ($ci == 0) {
 			$cv = substr($x[4], 0, 5);
 			if ($cv !== $curr_value && $cv == 0) {
@@ -63,33 +83,48 @@ while (true) {
 		        $add="";
 		        $val = $x[$i];
 			if ($i > 0 && $i < 5) {
+			        // strip trailing zeroes
 				$val = substr($x[$i], 0, 7);
 			}
 			if ($i == 5 || $i == 7 || $i == 9 || $i == 10) {
+			        // format volume fields
 				$val = substr($x[$i] / 1000, 0, 5);
 			        $add="K";
 			}
 			if ($i == 0 || $i == 6) {
+			    // make times look pretty...
+			    if($ci && $i==6){
+				$val = gmdate("H:i:s", time());
+			    } else {
 				$val = gmdate("H:i:s", ceil($x[$i] / 1000));
+			    }
 			}
 			if (!$ci) {
+			        // print on the left
 				echo (chr(27) . "[" . (4 + $i) . ";22H " . $val . $add . "  ");
 			}
 			if ($ci) {
+			        // print on the right
 				echo (chr(27) . "[" . (4 + $i) . ";63H " . $val . $add . "  ");
 			}
 		        
 		};
 		echo ("\n");
+	        // next item...
 		$ci++;
 	};
+    
+        // logic for calculating averages and emitting alerts
+    
 	$vol_avg = 0;
+        // if we don't have much data yet
 	if ($closures < $lookback_average_mins) {
 		for ($a = 0;$a < $closures;$a++) {
 			$vol_avg = $vol_avg + $volume_avg_array[$a];
 		}
 		$vol_avg = $vol_avg / $closures;
 	} else {
+	// if we have at least the maximum lookback_average_mins worth of data
 		for ($a = ($closures - 1);$a > ($closures - $lookback_average_mins);$a--) {
 			$vol_avg = $vol_avg + $volume_avg_array[$a];
 		}
@@ -97,6 +132,7 @@ while (true) {
 	}
 	$out = false;
 	echo ($ans . "16;0H");
+        // alert if value goes up/down by N.NNX
 	if (substr($x[4], 0, 5) !== $curr_value) {
 		if (substr($x[4], 0, 5) < $curr_value) {
 			$out.= "down " . substr($x[4], 0, 5) . "!   ";
@@ -104,23 +140,29 @@ while (true) {
 			$out.= "up " . substr($x[4], 0, 5) . "!   ";
 		} else {
 			//do nothing
-			
 		}
-		//	echo("cv: $curr_value nv: ".substr($x[4],0,5)."\n");
+	        // curr_value = price at present
 		$curr_value = substr($x[4], 0, 5);
 	}
+        // if the current candle's volume is 3 times the average, spawn alert
 	if ($x[5] > (3 * $vol_avg)) {
 		$out.= "Large Volume";
 	}
-	Echo ("Average volume ($closures): $vol_avg\n");
+        // current status
+	echo ("Average volume ($closures): $vol_avg\n");
 	echo ("Current value: \$$curr_value\n");
 	if ($out) {
+	        // speak and print the alert text
 		exec("espeak \"$out\" &");
 		echo ($out . "\n");
 	} else {
+	        // else erase previous alert from screen
 		echo (str_repeat(" ", 40));
 	}
-	sleep(5);
+        // how often to update
+	sleep(1);
+// end of while(true) loop
 };
+
 ?>
 
