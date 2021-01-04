@@ -1,0 +1,17 @@
+31/12/20 - 03/01/20
+
+ - Created original, basic version
+
+04/01/20
+
+ - Added ability to track percentage changes in asset over time, associated alerts
+ - Added sound playing when the last 5 price movements are up or down
+ - Added a debug feature.
+ - Started compartmentalizing functional aspects of the program
+ - Using JetBrains PHPStorm for development thanks to my student status it was a free license
+ - Added (dummy) exception handler so the app doesn't die if we fail a http request for example..
+
+ TODO: General code cleanliness / sanitization
+ TODO: Add more bits to the debug/config screen
+    - Monitor/alter current states of all variables
+    - Dump vars to file / config file
