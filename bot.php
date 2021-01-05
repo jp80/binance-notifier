@@ -189,6 +189,7 @@ NameSpace jmp0x0000\BinanceBot {
         function diplayDynamic( $a ){
             extract($a);
 
+            // Todo: display dynamic elements (separate UI code from logic so web implementation is easier)
 
         }
 
