@@ -1,6 +1,8 @@
-31/12/20 - 03/01/20
+05/01/21 Experimental OOP-PHP build. (I'm a bit rusty but not too bad considering its been years)
+05/01/21 Fixed bug with last-alert-timestamp for concurrent up/down events
 
- - Created original, basic version
+ TODO: Fix bug with volume variable
+ TODO: Make it work with all trading pairs available on Binance
 
 04/01/20
 
@@ -15,4 +17,10 @@
  TODO: Add more bits to the debug/config screen
     - Monitor/alter current states of all variables
     - Dump vars to file / config file
+
+ 31/12/20 - 03/01/20
+
+ - Created original, basic version
+
+
 
