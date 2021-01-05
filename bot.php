@@ -177,7 +177,7 @@ NameSpace jmp0x0000\BinanceBot {
                     $ci++;
                 };
                 $this->doAlerts();
-
+                sleep(1);
             }
         }
 
@@ -299,22 +299,20 @@ NameSpace jmp0x0000\BinanceBot {
                         $percent_change = (($alert["lastPrice"] - $candlePrice["this"]) / $alert["lastPrice"]) * 100;
                         $percent_change = $percent_change * -1;
                     } else $percent_change = 0;
-//        (float)$percent_change=((float)$candlePrice["this"]/100)*(float)$alert["lastPrice"];
-                //$add_status.="ccp: $candlePrice["this"] alp: $alert["lastPrice"]\n";
                 if ($percent_change > 0 && $percent_change > $alert["percent"]) {
                     $out = "Up " . number_format((float)$percent_change, 2, '.', '') . "  percent in the last $seconds_elapsed seconds";
                     $alert["lastPrice"] = $candlePrice["this"];
                     //$movement['up']++;
                     $move['down'][] = "0";
                     $move['up'][] = "1";
-                    $alert_last_check_time = time();
+                    $alert['lastCheckTs'] = time();
                 } else if ($percent_change < 0 && abs($percent_change) > $alert["percent"]) {
                     $out = "Down " . number_format((float)$percent_change, 2, '.', '') . " percent in the last $seconds_elapsed seconds";
                     $alert["lastPrice"] = $candlePrice["this"];
                     //$movement['down']++;
                     $move['down'][] = "1";
                     $move['up'][] = "0";
-                    $alert_last_check_time = time();
+                    $alert['lastCheckTs'] = time();
                 }
             }
             //if((last_val/100)*current_val
