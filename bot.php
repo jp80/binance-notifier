@@ -228,7 +228,7 @@ NameSpace jmp0x0000\BinanceBot {
         }
 
     }
-//read
+//read///
     // end of BinanceBot class
 
 
