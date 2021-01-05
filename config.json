@@ -1,0 +1,15 @@
+{
+    "apiCreds": [
+        "REPLACE_THIS_WITH_YOUR_API_KEY",
+        "REPLACE_THIS_WITH_YOUR_API_SECRET\n\n"
+    ],
+    "ans": "\u001b[",
+    "voice": "espeak-ng -a 120 -v en-gb ",
+    "alertpercent": "0.5",
+    "alertfreq": "60",
+    "alertpc_up_action": "aplay .\/sounds\/smb_1-up.wav >\/dev\/null 2>\/dev\/null &",
+    "alertpc_dn_action": "aplay .\/sounds\/smb_pipe.wav >\/dev\/null 2>\/dev\/null &",
+    "priceTsMax": 120,
+    "lookback_average_mins": 5,
+    "fetchDelay": "1"
+}

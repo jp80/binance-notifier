@@ -17,7 +17,12 @@ NameSpace jmp0x0000\BinanceBot {
 
     shell_exec('stty cbreak');
 
-    set_exception_handler('exception_handler');
+
+
+
+    if(isset($argv[2])){
+        $conf=$argv[2];
+    }
 
     $bb = new BinanceBot();
 
@@ -31,7 +36,8 @@ NameSpace jmp0x0000\BinanceBot {
     $bb->api = new DogApi\BinanceApiContainer($bb->conf["apiCreds"][0], $bb->conf["apiCreds"][1]);
     $bb->mainLoop();
 
-    die();
+
+    die(1);
 
 
 
@@ -40,6 +46,8 @@ NameSpace jmp0x0000\BinanceBot {
 
         public $conf = array();
         public $run  = array();
+
+        private $char_input = "";
 
         public $api;
 
@@ -63,19 +71,26 @@ NameSpace jmp0x0000\BinanceBot {
             return ($r);
         }
 
-        public function init_conf()
+        public function init_conf($confFileName)
         {
             $conf =& $this->conf;
             $run  =& $this->run;
 
-            $conf["apiCreds"] = explode(":", file_get_contents('./binance.api'));
-            $conf["ans"] = chr(27) . "[";    // ANSI escape sequence
-            $conf["voice"] = "espeak-ng -a 20 -v en-gb ";//voice synthesis command
-            $conf["alertpercent"] = 0.0025;       // how much up/down in percentage to watch for
-            $conf["alertfreq"] = 10;         // alert time and amount
-            $conf["priceTsMax"] = 120;                // price announcement max frequency in seconds, 0 to disable
-            $conf["lookback_average_mins"] = 5;       // set this to a higher number to flatten out the average over a longer time
-            $conf['fetchDelay'] = 10;                 // number of seconds to wait between querying API for latest prices
+            if(!$this->loadConfig($confFileName)){
+
+                $conf["apiCreds"] = explode(":", file_get_contents('./binance.api'));
+                $conf["ans"] = chr(27) . "[";    // ANSI escape sequence
+                $conf["voice"] = "espeak-ng -a 20 -v en-gb ";//voice synthesis command
+                $conf["alertpercent"] = 0.0025;       // how much up/down in percentage to watch for
+                $conf["alertfreq"] = 10;         // alert time and amount
+                // todo: make the percentage alert config an array so we can have different metrics to test against
+                // todo: and generate corresponding alarms
+                $conf["alertpc_up_action"] = "aplay ./sounds/smb_1-up.wav >/dev/null 2>/dev/null &";
+                $conf["alertpc_dn_action"] = "aplay ./sounds/smb_pipe.wav >/dev/null 2>/dev/null &";
+                $conf["priceTsMax"] = 120;                // price announcement max frequency in seconds, 0 to disable
+                $conf["lookback_average_mins"] = 5;       // set this to a higher number to flatten out the average over a longer time
+                $conf['fetchDelay'] = 10;                 // number of seconds to wait between querying API for latest prices
+            }
             $run["alert"]["lastCheckTs"] = time();   // timstamp of last percentage check
             $run["alert"]["lastPrice"] = 0;          // [RT] price at last percentage check
             $run["alert"]["concurrency"] = 0;        // [RT] Number of concurrent up/down events
@@ -224,13 +239,12 @@ NameSpace jmp0x0000\BinanceBot {
 
         public function debug()
         {
-            global $debugvars;
+
             echo(chr(27) . "[2J" . chr(27) . "[0H");
             $exitDebug = false;
             while (!$exitDebug) {
                 echo("\nx to exit, b to go back to bot, h for help\n");
-//                exec("bash read -i hello");
-                readline_add_history("my nan");
+
                 $comm = readline();
                 readline_add_history($comm);
                 if ($comm == "x") exit();
@@ -247,10 +261,10 @@ NameSpace jmp0x0000\BinanceBot {
                         $tmp=explode(" ", $comm);
                         $fn=$tmp[1];
                     } else {
-                        $fn="./bot.conf";
+                        $fn="./config.json";
                     }
-                    $lconf=json_decode(file_get_contents($fn),true);
-                    $this->conf=$lconf;
+                    $this->loadConfig($fn);
+
                     echo("Config $fn loaded!\n");
                 }
                 if (substr($comm, 0, 5) == "sconf") {
@@ -258,7 +272,7 @@ NameSpace jmp0x0000\BinanceBot {
                         $tmp=explode(" ", $comm);
                         $fn=$tmp[1];
                     } else {
-                        $fn="./bot.conf";
+                        $fn="./config.json";
                     }
                     $fp=fopen($fn, 'w');
                     fputs($fp, json_encode($this->conf, JSON_PRETTY_PRINT));
@@ -287,6 +301,23 @@ NameSpace jmp0x0000\BinanceBot {
             $this->displayConstants();
         }
 
+        public function loadConfig($fn){
+            //die("loadconfig");
+            if(!file_exists($fn)){
+                if(file_exists("./config.json")){
+                    $fn="./config.json";
+                }
+            }
+            if($fn && file_exists($fn)){
+                $lconf = json_decode(file_get_contents($fn), true);
+                $this->conf = $lconf;
+                return true;
+            } else {
+                return false;
+            }
+
+        }
+
         public function doAlerts()
         {
             // logic for calculating averages and emitting alerts
@@ -299,7 +330,6 @@ NameSpace jmp0x0000\BinanceBot {
             $volume_avg_array      =& $run['volume_avg_array'];
             $vol_avg               =& $run['vol_avg'];
             $priceTs               =& $run['priceTs'];
-            $priceTsMax            =& $run['priceTsMax'];
             $curr_value            =& $run['curr_value'];
             $lastVolume            =& $run['lastvol'];
             $alert                 =& $run['alert'];
@@ -308,8 +338,9 @@ NameSpace jmp0x0000\BinanceBot {
 
             $lookback_average_mins =& $conf['lookback_average_mins'];
             $ans                   =& $conf['ans'];
+            $priceTsMax            =& $conf['priceTsMax'];
 
-            $add_status = "";
+            //$add_status = "";
 
             // calculate the average volume over $lookback_average_mins
 
@@ -407,13 +438,13 @@ NameSpace jmp0x0000\BinanceBot {
             if ($upc > $dnc) $bob = "Up ($upc/$dnc)"; else if ($dnc > $upc) $bob = "Down (" . $dnc . "/$upc)                 "; else $bob = "No movement                      ";
             if ($upc == 5) {
                 if ((time() - $run["lastupsnd"]) > 60) {
-                    shell_exec("aplay ./sounds/smb_1-up.wav");
+                    shell_exec($conf["alertpc_up_action"]);
                     $run["lastupsnd"] = time();
                 }
             }
             if ($dnc == 5) {
                 if ((time() - $run["lastdnsnd"]) > 60) {
-                    shell_exec("aplay ./sounds/smb_pipe.wav");
+                    shell_exec($conf["alertpc_dn_action"] );
                     $run["lastdnsnd"] = time();
                 }
             }
@@ -421,13 +452,18 @@ NameSpace jmp0x0000\BinanceBot {
             echo($add_status);
             if ($out) {
                 // speak and print the alert text
-                shell_exec($this->conf["voice"] . " \"$out\" &");
+                shell_exec($this->conf["voice"] . " \"$out\" >/dev/null 2>/dev/null &");
                 echo($out . "\n");
             } else {
                 // else erase previous alert from screen
                 echo(str_repeat(" ", 40));
             }
         }
+        function exception_handler($exception)
+        {
+            echo "Uncaught exception: ", $exception->getMessage(), "\n";
+        }
+
 
     }
 
@@ -435,10 +471,6 @@ NameSpace jmp0x0000\BinanceBot {
 // utility functions
 
 
-    function exception_handler($exception)
-    {
-        echo "Uncaught exception: ", $exception->getMessage(), "\n";
-    }
 
 }
 ?>

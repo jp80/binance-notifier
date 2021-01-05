@@ -1,5 +1,7 @@
 {
     "require": {
-        "larislackers/php-binance": "^1.0"
+        "larislackers/php-binance": "^1.0",
+      "ext-json": "*",
+      "ext-readline": "*"
     }
 }
