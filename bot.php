@@ -6,7 +6,8 @@
 
 // ** If this code is useful to you, I accept donations:
 // ** Paypal: https://paypal.me/jd80
-// ** XRP:
+// ** XRP: Address: rEb8TK3gBgk5auZkwc6sHnwrGVJH8DuaLh Tag: 104071485
+// ** XRP (BEP20) Address: 0xeac9832313c854cf86f8ce79466c76f920a49a31
 
 NameSpace jmp0x0000\BinanceBot {
 
@@ -14,9 +15,19 @@ NameSpace jmp0x0000\BinanceBot {
 
     use \Larislackers\BinanceApi as DogApi;
 
-//$bApi->startUserDataStream("an","aa");
-
     shell_exec('stty cbreak');
+
+    set_exception_handler('exception_handler');
+
+    $bb = new BinanceBot();
+    $bb->init_conf();
+    $bb->print_screen_constants();
+    $bb->api = new DogApi\BinanceApiContainer($bb->conf["apiCreds"][0], $bb->conf["apiCreds"][1]);
+    $bb->mainLoop();
+
+    die();
+
+
 
     class BinanceBot
     {
@@ -174,7 +185,7 @@ NameSpace jmp0x0000\BinanceBot {
         {
             // Headings for the Binance API responses
 
-            global $ans;
+            $ans=$this->conf['ans'];
 
             $fn[0] = "Open Time";
             $fn[1] = "Open";
@@ -352,25 +363,6 @@ NameSpace jmp0x0000\BinanceBot {
 
     }
 
-//read///
-    // end of BinanceBot class
-
-
-    $bb = new BinanceBot();
-
-
-    set_exception_handler('exception_handler');
-
-    $bb->print_screen_constants();
-
-    $bb->init_conf();
-
-    $bb->api = new DogApi\BinanceApiContainer($bb->conf["apiCreds"][0], $bb->conf["apiCreds"][1]);
-
-    $bb->mainLoop();
-
-
-    die();
 
 // utility functions
 
