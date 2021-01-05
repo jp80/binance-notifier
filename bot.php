@@ -20,8 +20,14 @@ NameSpace jmp0x0000\BinanceBot {
     set_exception_handler('exception_handler');
 
     $bb = new BinanceBot();
-    $bb->init_conf();
-    $bb->print_screen_constants();
+
+    if(isset($conf)) {
+        $bb->init_conf($conf);
+    } else {
+        $bb->init_conf(false);
+    }
+
+    $bb->displayConstants();
     $bb->api = new DogApi\BinanceApiContainer($bb->conf["apiCreds"][0], $bb->conf["apiCreds"][1]);
     $bb->mainLoop();
 
@@ -33,6 +39,7 @@ NameSpace jmp0x0000\BinanceBot {
     {
 
         public $conf = array();
+        public $run  = array();
 
         public $api;
 
@@ -58,43 +65,38 @@ NameSpace jmp0x0000\BinanceBot {
 
         public function init_conf()
         {
-            $this->conf["apiCreds"] = explode(":", file_get_contents('./binance.api'));
-            $this->conf["ans"] = chr(27) . "[";
-            $this->conf["voice"] = "espeak-ng -a 20 -v en-gb ";
-            $this->conf["alert"]["percent"] = 0.1;
-            $this->conf["alert"]["frequency"] = 30; // alert time and amount
-            $this->conf["alert"]["lastCheckTs"] = time();
-            $this->conf["alert"]["lastPrice"] = 0;
-            $this->conf["alert"]["concurrency"] = 0;
-            $this->conf["movement"]['down'] = 0;
-            $this->conf["movement"]['up'] = 0;
-            $this->conf["move"]['up'] = array();
-            $this->conf["move"]['down'] = array();
-            // set this to a higher number to flatten out the average over a longer time
-            $this->conf["lookback_average_mins"] = 5;
-// current iteration ( for looping over the last 2 mins of data from exchange)
-            $this->conf["ci"] = 0;
-// timestamp of last close
-            $this->conf["lastclose"] = 0;
-// last volums
-            $this->conf["lastvol"] = 0;
-// array of volumes
-            $this->conf["volume_avg_array"] = array();
-// variable for calculated average
-            $this->conf["vol_avg"] = 0;
-// last cent value (rounded down to two decimal places
-            $this->conf["curr_value"] = 0;
-// timestamp of last price announcement
-            $this->conf["priceTs"] = time();
-// price announcement max frequency in seconds, 0 to disable
-            $this->conf["priceTsMax"] = 120;
-// do this forever...
-            $this->conf["add_status"] = "";
-            $this->conf["lastupsnd"] = 0;
-            $this->conf["lastdnsnd"] = 0;
-            $this->conf["candlePrice"]["this"] = 0;
-            $this->conf["candlePrice"]["prev"] = 0;
+            $conf =& $this->conf;
+            $run  =& $this->run;
+
+            $conf["apiCreds"] = explode(":", file_get_contents('./binance.api'));
+            $conf["ans"] = chr(27) . "[";    // ANSI escape sequence
+            $conf["voice"] = "espeak-ng -a 20 -v en-gb ";//voice synthesis command
+            $conf["alertpercent"] = 0.0025;       // how much up/down in percentage to watch for
+            $conf["alertfreq"] = 10;         // alert time and amount
+            $conf["priceTsMax"] = 120;                // price announcement max frequency in seconds, 0 to disable
+            $conf["lookback_average_mins"] = 5;       // set this to a higher number to flatten out the average over a longer time
+            $conf['fetchDelay'] = 10;                 // number of seconds to wait between querying API for latest prices
+            $run["alert"]["lastCheckTs"] = time();   // timstamp of last percentage check
+            $run["alert"]["lastPrice"] = 0;          // [RT] price at last percentage check
+            $run["alert"]["concurrency"] = 0;        // [RT] Number of concurrent up/down events
+            $run["move"]['up'] = array();            // [RT] for running total of up events
+            $run["move"]['down'] = array();          // [RT] for running total of down events
+            $run["ci"] = 0;                          // [RT] current iteration ( for looping over the last 2 mins of data from exchange)
+            $run["lastclose"] = 0;                   // [RT] timestamp of last close
+            $run["lastvol"] = 0;                     // [RT] last volume
+            $run["volume_avg_array"] = array();      // [RT] array of volumes
+            $run["vol_avg"] = 0;                     // [RT] variable for calculated average
+            $run["curr_value"] = 0;                  // [RT] last cent value (rounded down to two decimal places
+            $run["priceTs"] = time();                // [RT] timestamp of last price announcement
+            $run["add_status"] = "";                 // [RT] adds this text to the other status text below the candle info
+            $run["lastupsnd"] = 0;                   // [RT] timstamp of last percentage-up alert was played (to stop it looping too often)
+            $run["lastdnsnd"] = 0;                   // [RT] timstamp of last percentage-down alert was played (to stop it looping too often)
+            $run["candlePrice"]["this"] = 0;         // [RT] Holds current candle price
+            $run["candlePrice"]["prev"] = 0;         // [RT] Holds previous candle price
+
+            // TODO: Some of these vars could do with having a $this->rtVars[*] (runtime vars as opposed to config vars)
         }
+
 
         public function printconf()
         {
@@ -115,7 +117,10 @@ NameSpace jmp0x0000\BinanceBot {
 
         public function mainLoop()
         {
-            $candlePrice =& $this->conf['candlePrice'];
+
+            $conf =& $this->conf;
+            $run =& $this->run;
+            $candlePrice =& $run['candlePrice'];
             while (true) {
                 if ($this->non_block_read(STDIN, $this->char_input)) {
 //    echo "Input: " . $x . "\n";
@@ -129,15 +134,15 @@ NameSpace jmp0x0000\BinanceBot {
                 // parse candle data
                 foreach (json_Decode($orders->getBody()->getContents()) as $x) {
                     if ($ci == 0) {
-                        $this->conf['cv'] = substr($x[4], 0, 5);
-                        if ($this->conf['cv'] !== $this->conf['curr_value'] && $this->conf['cv'] == 0) {
-                            $this->conf['curr_value'] = $this->conf['cv'];
+                        $run['cv'] = substr($x[4], 0, 5);
+                        if ($run['cv'] !== $run['curr_value'] && $run['cv'] == 0) {
+                            $run['curr_value'] = $run['cv'];
                         }
                     }
-                    if ($ci == 0 && $this->conf['lastclose'] !== $x[6]) {
-                        $this->conf['lastclose'] = $x[6];
-                        $this->conf['volume_avg_array'][] = $x[5];
-                        $this->conf['closures'] = count($this->conf['volume_avg_array']);
+                    if ($ci == 0 && $run['lastclose'] !== $x[6]) {
+                        $run['lastclose'] = $x[6];
+                        $run['volume_avg_array'][] = $x[5];
+                        $run['closures'] = count($run['volume_avg_array']);
                     }
                     for ($i = 0; $i < count($x) - 1; $i++) {
                         $add = "";
@@ -171,21 +176,27 @@ NameSpace jmp0x0000\BinanceBot {
                             $candlePrice['this'] = $x[4];
                         }
 
-                    };
+                    }
                     echo("\n");
                     // next item...
                     $ci++;
-                };
+                }
                 $this->doAlerts();
-                sleep(1);
+                sleep($conf["fetchDelay"]);
             }
         }
 
-        public function print_screen_constants()
+        function diplayDynamic( $a ){
+            extract($a);
+
+
+        }
+
+        function displayConstants()
         {
             // Headings for the Binance API responses
 
-            $ans=$this->conf['ans'];
+            $ans = $this->conf['ans'];
 
             $fn[0] = "Open Time";
             $fn[1] = "Open";
@@ -209,6 +220,7 @@ NameSpace jmp0x0000\BinanceBot {
         }
 
 
+
         public function debug()
         {
             global $debugvars;
@@ -219,45 +231,94 @@ NameSpace jmp0x0000\BinanceBot {
 //                exec("bash read -i hello");
                 readline_add_history("my nan");
                 $comm = readline();
+                readline_add_history($comm);
                 if ($comm == "x") exit();
                 if ($comm == "b") $exitDebug = true;
                 if ($comm == "h") {
-                    echo("printvar <varname> - dump contents\n");
-                    echo("printvar           - dump all vars\n");
+                    echo("setvar <varname> <value>    - set CONFIG variable\n");
+                    echo("printvar                    - dump all vars\n");
+                    echo("lconf [<filename>]          - load config <filename> or default\n");
+                    echo("sconf [<filename>]          - save config <filename> or default\n");
 
                 }
+                if (substr($comm, 0, 5) == "lconf") {
+                    if(stristr($comm, " ")){
+                        $tmp=explode(" ", $comm);
+                        $fn=$tmp[1];
+                    } else {
+                        $fn="./bot.conf";
+                    }
+                    $lconf=json_decode(file_get_contents($fn),true);
+                    $this->conf=$lconf;
+                    echo("Config $fn loaded!\n");
+                }
+                if (substr($comm, 0, 5) == "sconf") {
+                    if(stristr($comm, " ")){
+                        $tmp=explode(" ", $comm);
+                        $fn=$tmp[1];
+                    } else {
+                        $fn="./bot.conf";
+                    }
+                    $fp=fopen($fn, 'w');
+                    fputs($fp, json_encode($this->conf, JSON_PRETTY_PRINT));
+                    fclose($fp);
+                    echo("Config $fn saved!\n");
+                }
+                if (substr($comm, 0, 6) == "setvar") {
+                    $tmp=explode(" ", $comm);
+                    $varname = $tmp[1];
+                    $varval  = $tmp[2];
+                    $this->conf[$varname] = $varval;
+                    echo("\$this->conf[\"$varname\"] = \"$varval\"\n");
+                }
                 if (substr($comm, 0, 8) == "printvar") {
+                    echo(chr(27) . "[2J" . chr(27) . "[0H");
+                    echo("\nConfiguration:\n");
                     foreach (array_keys($this->conf) as $key) {
                         echo($key . " : " . json_encode($this->conf[$key]) . "\n");
                     }
+                    echo("\nRuntime:\n");
+                    foreach (array_keys($this->run) as $key) {
+                        echo($key . " : " . json_encode($this->run[$key]) . "\n");
+                    }
                 }
             }
-            $this->print_screen_constants();
+            $this->displayConstants();
         }
 
         public function doAlerts()
-        {       // logic for calculating averages and emitting alerts
+        {
+            // logic for calculating averages and emitting alerts
+
+            // reference the conf variables from our class.
+
             $conf =& $this->conf;
-            $closures =& $conf['closures'];
+            $run  =& $this->run;
+            $closures              =& $run['closures'];
+            $volume_avg_array      =& $run['volume_avg_array'];
+            $vol_avg               =& $run['vol_avg'];
+            $priceTs               =& $run['priceTs'];
+            $priceTsMax            =& $run['priceTsMax'];
+            $curr_value            =& $run['curr_value'];
+            $lastVolume            =& $run['lastvol'];
+            $alert                 =& $run['alert'];
+            $candlePrice           =& $run["candlePrice"];
+            $move                  =& $run["move"];
+
             $lookback_average_mins =& $conf['lookback_average_mins'];
-            $volume_avg_array =& $conf['volume_avg_array'];
-            $vol_avg =& $conf['vol_avg'];
-            $priceTs =& $conf['priceTs'];
-            $priceTsMax =& $conf['priceTsMax'];
-            $curr_value =& $conf['curr_value'];
-            $ans =& $conf['ans'];
-            $vol_avg = &$conf['vol_avg'];
-            $lastVolume = &$this->conf['lastvol'];
-            $alert = &$conf['alert'];
-            $candlePrice =& $this->conf["candlePrice"];
-            $move =& $this->conf["move"];
+            $ans                   =& $conf['ans'];
+
             $add_status = "";
+
+            // calculate the average volume over $lookback_average_mins
+
             // if we don't have much data yet
-            if ($conf['closures'] < $conf['lookback_average_mins']) {
-                for ($a = 0; $a < $conf['closures']; $a++) {
-                    $vol_avg = $vol_avg + $conf['volume_avg_array'][$a];
+            if ($run['closures'] < $conf['lookback_average_mins']) {
+                for ($a = 0; $a < $run['closures']; $a++) {
+                    //echo($a);
+                    //$vol_avg = $vol_avg + $run['volume_avg_array'][$a];
                 }
-                $vol_avg = $vol_avg / $conf['closures'];
+                //$vol_avg = $vol_avg / $run['closures'];
             } else {
                 // if we have at least the maximum lookback_average_mins worth of data
                 for ($a = ($closures - 1); $a > ($closures - $lookback_average_mins); $a--) {
@@ -286,27 +347,27 @@ NameSpace jmp0x0000\BinanceBot {
                 $curr_value = substr($candlePrice['this'], 0, 5);
             }
             // check if asset rises/falls by X% over Y time
-            if (time() > ($alert["lastCheckTs"] + $alert["frequency"])) {
+            if (time() > ($alert["lastCheckTs"] + $conf["alertfreq"])) {
                 $seconds_elapsed = time() - $alert["lastCheckTs"];
 
                 if (!$alert["lastPrice"]) {
                     $alert["lastPrice"] = $candlePrice["this"];
                 }
-                if ($candlePrice["this"] > $alert["lastPrice"]) {
+                if ($candlePrice["this"] > $alert["lastPrice"]) { // TODO: This needs to be based on a recent price but not the most recent.
                     $percent_change = (($candlePrice["this"] - $alert["lastPrice"]) / $alert["lastPrice"]) * 100;
                 } else
                     if ($candlePrice["this"] < $alert["lastPrice"]) {
                         $percent_change = (($alert["lastPrice"] - $candlePrice["this"]) / $alert["lastPrice"]) * 100;
                         $percent_change = $percent_change * -1;
                     } else $percent_change = 0;
-                if ($percent_change > 0 && $percent_change > $alert["percent"]) {
+                if ($percent_change > 0 && $percent_change > $conf["alertpercent"]) {
                     $out = "Up " . number_format((float)$percent_change, 2, '.', '') . "  percent in the last $seconds_elapsed seconds";
                     $alert["lastPrice"] = $candlePrice["this"];
                     //$movement['up']++;
                     $move['down'][] = "0";
                     $move['up'][] = "1";
                     $alert['lastCheckTs'] = time();
-                } else if ($percent_change < 0 && abs($percent_change) > $alert["percent"]) {
+                } else if ($percent_change < 0 && abs($percent_change) > $conf["alertpercent"]) {
                     $out = "Down " . number_format((float)$percent_change, 2, '.', '') . " percent in the last $seconds_elapsed seconds";
                     $alert["lastPrice"] = $candlePrice["this"];
                     //$movement['down']++;
@@ -329,25 +390,33 @@ NameSpace jmp0x0000\BinanceBot {
             if ($mCount < $mm_check) $mm_check = $mCount;
             $upc = 0;
             $dnc = 0;
+            $lastups="";
             for ($x = $mCount - $mm_check; $x < $mCount; $x++) {
-                if ($move['up'][$x] == 1) $upc++;
-                if ($move['down'][$x] == 1) $dnc++;
+                if ($move['up'][$x] == 1) {
+                    $upc++;
+                    $lastups=$lastups."1";
+                } else {
+                    $dnc++;
+                    $lastups=$lastups."0";
+                }
+//                if ($move['down'][$x] == 1) $dnc++;
             }
+            $add_status=$lastups;
             $msum = $upc - $dnc;
             if ($upc > $dnc) $bob = "Up ($upc/$dnc)"; else if ($dnc > $upc) $bob = "Down (" . $dnc . "/$upc)                 "; else $bob = "No movement                      ";
             if ($upc == 5) {
-                if ((time() - $this->conf["lastupsnd"]) > 60) {
+                if ((time() - $run["lastupsnd"]) > 60) {
                     shell_exec("aplay ./sounds/smb_1-up.wav");
-                    $this->conf["lastupsnd"] = time();
+                    $run["lastupsnd"] = time();
                 }
             }
             if ($dnc == 5) {
-                if ((time() - $this->conf["lastdnsnd"]) > 60) {
+                if ((time() - $run["lastdnsnd"]) > 60) {
                     shell_exec("aplay ./sounds/smb_pipe.wav");
-                    $this->conf["lastdnsnd"] = time();
+                    $run["lastdnsnd"] = time();
                 }
             }
-            echo("Last $mm_check movements (>" . $alert["percent"] . "%): " . $bob . "                               \n");
+            echo("Last $mm_check movements (>" . $conf["alertpercent"] . "%): " . $bob . "                               \n");
             echo($add_status);
             if ($out) {
                 // speak and print the alert text
