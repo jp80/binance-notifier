@@ -1,51 +1,43 @@
 #!/usr/bin/php
-<?php
-//// (c) jp80 (jamie[at]txt3.com)
-//// (c) jp80 (jamie[at]txt3.com)
+<?php namespace jmp0x0000\BinanceBot {
+
+//// (c) 2020,2021 jp80 (jamie[at]txt3.com)
+//// A bot for Binance API to notify user of large changes in price/volume
 //// See https://de.zyns.com for more information regarding this code and my other projects.
 
-// ** If this code is useful to you, I accept donations:
-// ** Paypal: https://paypal.me/jd80
-// ** XRP: Address: rEb8TK3gBgk5auZkwc6sHnwrGVJH8DuaLh Tag: 104071485
-// ** XRP (BEP20) Address: 0xeac9832313c854cf86f8ce79466c76f920a49a31
-
-NameSpace jmp0x0000\BinanceBot {
+//// If this code is useful to you, I accept donations:
+//// Paypal: https://paypal.me/jd80
+//// XRP: Address: rEb8TK3gBgk5auZkwc6sHnwrGVJH8DuaLh Tag: 104071485
+//// XRP (BEP20) Address: 0xeac9832313c854cf86f8ce79466c76f920a49a31
 
     require('vendor/autoload.php');
 
-    use \Larislackers\BinanceApi as DogApi;
+    use \Larislackers\BinanceApi as BApi;
 
     shell_exec('stty cbreak');
 
-
-
-
-    if(isset($argv[2])){
-        $conf=$argv[2];
+    if (isset($argv[2])) {
+        $conf = $argv[2];
     }
 
     $bb = new BinanceBot();
 
-    if(isset($conf)) {
+    if (isset($conf)) {
         $bb->init_conf($conf);
     } else {
         $bb->init_conf(false);
     }
 
     $bb->displayConstants();
-    $bb->api = new DogApi\BinanceApiContainer($bb->conf["apiCreds"][0], $bb->conf["apiCreds"][1]);
+    $bb->api = new BApi\BinanceApiContainer($bb->conf["apiCreds"][0], $bb->conf["apiCreds"][1]);
     $bb->mainLoop();
-
 
     die(1);
 
-
-
     class BinanceBot
     {
-
         public $conf = array();
-        public $run  = array();
+        public $run = array();
 
         private $char_input = "";
 
@@ -74,9 +66,9 @@ NameSpace jmp0x0000\BinanceBot {
         public function init_conf($confFileName)
         {
             $conf =& $this->conf;
-            $run  =& $this->run;
+            $run =& $this->run;
 
-            if(!$this->loadConfig($confFileName)){
+            if (!$this->loadConfig($confFileName)) {
 
                 $conf["apiCreds"] = explode(":", file_get_contents('./binance.api'));
                 $conf["ans"] = chr(27) . "[";    // ANSI escape sequence
@@ -90,6 +82,11 @@ NameSpace jmp0x0000\BinanceBot {
                 $conf["priceTsMax"] = 120;                // price announcement max frequency in seconds, 0 to disable
                 $conf["lookback_average_mins"] = 5;       // set this to a higher number to flatten out the average over a longer time
                 $conf['fetchDelay'] = 10;                 // number of seconds to wait between querying API for latest prices
+                $conf["tradePair"] = "XRPUSDT";           // the trading pair we're using
+                $conf["logFile"] = "/tmp/bot-xrp.log";
+                $conf["errorLog"] = "/tmp/bot-xrp-error.log";
+                $conf["voiceOn"] = true;
+
             }
             $run["alert"]["lastCheckTs"] = time();   // timstamp of last percentage check
             $run["alert"]["lastPrice"] = 0;          // [RT] price at last percentage check
@@ -145,7 +142,8 @@ NameSpace jmp0x0000\BinanceBot {
                 // current item - 0 = prev candle, 1 = curr candle
                 $ci = 0;
                 // get the candle data from binance
-                $orders = $this->api->getKlines(['symbol' => 'XRPUSDT', 'interval' => '1m', 'limit' => '2']);
+                $orders = $this->api->getKlines(['symbol' => $conf['tradePair'], 'interval' => '1m', 'limit' => '2']);
+                // Todo: On first run fetch data historical candles.
                 // parse candle data
                 foreach (json_Decode($orders->getBody()->getContents()) as $x) {
                     if ($ci == 0) {
@@ -193,7 +191,7 @@ NameSpace jmp0x0000\BinanceBot {
 
                     }
                     echo("\n");
-                    // next item...
+                    // next item....
                     $ci++;
                 }
                 $this->doAlerts();
@@ -201,7 +199,8 @@ NameSpace jmp0x0000\BinanceBot {
             }
         }
 
-        function diplayDynamic( $a ){
+        function diplayDynamic($a)
+        {
             extract($a);
 
             // Todo: display dynamic elements (separate UI code from logic so web implementation is easier)
@@ -227,14 +226,13 @@ NameSpace jmp0x0000\BinanceBot {
             $fn[10] = "Taker buy quote vol.";
 
             echo($ans . "2J" . $ans . "0;0H");        // clear the terminal
-            echo("\n" . str_pad("Last Candle", 41) . "Current Candle\n" . str_repeat("-", 78));        // header text
+            echo("\n" . str_pad("Last Candle       Trading: " . $this->conf['tradePair'], 41) . "Current Candle\n" . str_repeat("-", 78));        // header text
             for ($j = 0; $j < 11; $j++) {         // populate field names
                 $i = $j + 4;
                 echo($ans . $i . ";0H" . str_pad($fn[$j], 20) . ":" . $ans . $i . ";42H" . str_pad($fn[$j], 20) . ":\n");
             }
             echo($ans . "15;0H" . str_repeat("-", 78));         // draw a line under the fields
         }
-
 
 
         public function debug()
@@ -249,68 +247,114 @@ NameSpace jmp0x0000\BinanceBot {
                 readline_add_history($comm);
                 if ($comm == "x") exit();
                 if ($comm == "b") $exitDebug = true;
-                if ($comm == "h") {
-                    echo("setvar <varname> <value>    - set CONFIG variable\n");
-                    echo("printvar                    - dump all vars\n");
+                if ($comm == "h" || $comm == "?") {
+                    echo("set <varname> <value>       - set CONFIG variable\n");
+                    echo("pv                          - dump all vars\n");
+                    echo("lrt [<filename>]	      - load runtime vars");
+                    echo("srt [<filename>]	      - save runtime vars");
                     echo("lconf [<filename>]          - load config <filename> or default\n");
                     echo("sconf [<filename>]          - save config <filename> or default\n");
-
+                    echo("x			      - save vars and exit\n");
+                    echo("b			      - back to app\n");
+                    echo("h / ?			      - display this help\n");
                 }
                 if (substr($comm, 0, 5) == "lconf") {
-                    if(stristr($comm, " ")){
-                        $tmp=explode(" ", $comm);
-                        $fn=$tmp[1];
+                    if (stristr($comm, " ")) {
+                        $tmp = explode(" ", $comm);
+                        $fn = $tmp[1];
                     } else {
-                        $fn="./config.json";
+                        $fn = "./config.json";
                     }
                     $this->loadConfig($fn);
 
                     echo("Config $fn loaded!\n");
                 }
-                if (substr($comm, 0, 5) == "sconf") {
-                    if(stristr($comm, " ")){
-                        $tmp=explode(" ", $comm);
-                        $fn=$tmp[1];
+                if (substr($comm, 0, 3) == "lrt") {
+                    if (stristr($comm, " ")) {
+                        $tmp = explode(" ", $comm);
+                        $fn = $tmp[1];
                     } else {
-                        $fn="./config.json";
+                        $fn = "./runtime.json";
                     }
-                    $fp=fopen($fn, 'w');
+                    $this->loadRuntime($fn);
+
+                    echo("Runtime vars $fn loaded!\n");
+                }
+                if (substr($comm, 0, 5) == "sconf") {
+                    if (stristr($comm, " ")) {
+                        $tmp = explode(" ", $comm);
+                        $fn = $tmp[1];
+                    } else {
+                        $fn = "./config.json";
+                    }
+                    $fp = fopen($fn, 'w');
                     fputs($fp, json_encode($this->conf, JSON_PRETTY_PRINT));
                     fclose($fp);
                     echo("Config $fn saved!\n");
                 }
-                if (substr($comm, 0, 6) == "setvar") {
-                    $tmp=explode(" ", $comm);
+                if (substr($comm, 0, 3) == "srt") {
+                    if (stristr($comm, " ")) {
+                        $tmp = explode(" ", $comm);
+                        $fn = $tmp[1];
+                    } else {
+                        $fn = "./runtime.json";
+                    }
+                    $fp = fopen($fn, 'w');
+                    fputs($fp, json_encode($this->run, JSON_PRETTY_PRINT));
+                    fclose($fp);
+                    echo("Runtime vars $fn saved!\n");
+                }
+                if (substr($comm, 0, 3) == "set") {
+                    $tmp = explode(" ", $comm);
                     $varname = $tmp[1];
-                    $varval  = $tmp[2];
+                    $varval = $tmp[2];
                     $this->conf[$varname] = $varval;
                     echo("\$this->conf[\"$varname\"] = \"$varval\"\n");
                 }
-                if (substr($comm, 0, 8) == "printvar") {
+                if (substr($comm, 0, 2) == "pv") {
                     echo(chr(27) . "[2J" . chr(27) . "[0H");
-                    echo("\nConfiguration:\n");
-                    foreach (array_keys($this->conf) as $key) {
-                        echo($key . " : " . json_encode($this->conf[$key]) . "\n");
-                    }
                     echo("\nRuntime:\n");
                     foreach (array_keys($this->run) as $key) {
                         echo($key . " : " . json_encode($this->run[$key]) . "\n");
+                    }
+                    echo("\nConfiguration:\n");
+                    foreach (array_keys($this->conf) as $key) {
+                        echo($key . " : " . json_encode($this->conf[$key]) . "\n");
                     }
                 }
             }
             $this->displayConstants();
         }
 
-        public function loadConfig($fn){
+        public function loadConfig($fn)
+        {
             //die("loadconfig");
-            if(!file_exists($fn)){
-                if(file_exists("./config.json")){
-                    $fn="./config.json";
+            if (!file_exists($fn)) {
+                if (file_exists("./config.json")) {
+                    $fn = "./config.json";
                 }
             }
-            if($fn && file_exists($fn)){
+            if ($fn && file_exists($fn)) {
                 $lconf = json_decode(file_get_contents($fn), true);
                 $this->conf = $lconf;
+                return true;
+            } else {
+                return false;
+            }
+
+        }
+
+        public function loadRuntime($fn)
+        {
+            //die("loadconfig");
+            if (!file_exists($fn)) {
+                if (file_exists("./runtime.json")) {
+                    $fn = "./runtime.json";
+                }
+            }
+            if ($fn && file_exists($fn)) {
+                $lconf = json_decode(file_get_contents($fn), true);
+                $this->run = $lconf;
                 return true;
             } else {
                 return false;
@@ -325,20 +369,20 @@ NameSpace jmp0x0000\BinanceBot {
             // reference the conf variables from our class.
 
             $conf =& $this->conf;
-            $run  =& $this->run;
-            $closures              =& $run['closures'];
-            $volume_avg_array      =& $run['volume_avg_array'];
-            $vol_avg               =& $run['vol_avg'];
-            $priceTs               =& $run['priceTs'];
-            $curr_value            =& $run['curr_value'];
-            $lastVolume            =& $run['lastvol'];
-            $alert                 =& $run['alert'];
-            $candlePrice           =& $run["candlePrice"];
-            $move                  =& $run["move"];
+            $run =& $this->run;
+            $closures =& $run['closures'];
+            $volume_avg_array =& $run['volume_avg_array'];
+            $vol_avg =& $run['vol_avg'];
+            $priceTs =& $run['priceTs'];
+            $curr_value =& $run['curr_value'];
+            $lastVolume =& $run['lastvol'];
+            $alert =& $run['alert'];
+            $candlePrice =& $run["candlePrice"];
+            $move =& $run["move"];
 
             $lookback_average_mins =& $conf['lookback_average_mins'];
-            $ans                   =& $conf['ans'];
-            $priceTsMax            =& $conf['priceTsMax'];
+            $ans =& $conf['ans'];
+            $priceTsMax =& $conf['priceTsMax'];
 
             //$add_status = "";
 
@@ -378,7 +422,12 @@ NameSpace jmp0x0000\BinanceBot {
                 // curr_value = price at present
                 $curr_value = substr($candlePrice['this'], 0, 5);
             }
+            //
             // check if asset rises/falls by X% over Y time
+            //
+            // TODO: multiple percentage alerts via foreach over array of arrays
+            // TODO: this also to be done for target prices
+
             if (time() > ($alert["lastCheckTs"] + $conf["alertfreq"])) {
                 $seconds_elapsed = time() - $alert["lastCheckTs"];
 
@@ -422,43 +471,54 @@ NameSpace jmp0x0000\BinanceBot {
             if ($mCount < $mm_check) $mm_check = $mCount;
             $upc = 0;
             $dnc = 0;
-            $lastups="";
+            $lastups = "";
             for ($x = $mCount - $mm_check; $x < $mCount; $x++) {
                 if ($move['up'][$x] == 1) {
                     $upc++;
-                    $lastups=$lastups."1";
+                    $lastups = $lastups . "1";
                 } else {
                     $dnc++;
-                    $lastups=$lastups."0";
+                    $lastups = $lastups . "0";
                 }
 //                if ($move['down'][$x] == 1) $dnc++;
             }
-            $add_status=$lastups;
+            $add_status = $lastups;
             $msum = $upc - $dnc;
             if ($upc > $dnc) $bob = "Up ($upc/$dnc)"; else if ($dnc > $upc) $bob = "Down (" . $dnc . "/$upc)                 "; else $bob = "No movement                      ";
-            if ($upc == 5) {
-                if ((time() - $run["lastupsnd"]) > 60) {
-                    shell_exec($conf["alertpc_up_action"]);
-                    $run["lastupsnd"] = time();
+            if ($conf["alertOn"] == "y" || $conf['alertOn'] == 'on') {
+                if ($upc == 5) {
+                    if ((time() - $run["lastupsnd"]) > 60) {
+                        shell_exec($conf["alertpc_up_action"]);
+                        $run["lastupsnd"] = time();
+                    }
                 }
-            }
-            if ($dnc == 5) {
-                if ((time() - $run["lastdnsnd"]) > 60) {
-                    shell_exec($conf["alertpc_dn_action"] );
-                    $run["lastdnsnd"] = time();
+                if ($dnc == 5) {
+                    if ((time() - $run["lastdnsnd"]) > 60) {
+                        shell_exec($conf["alertpc_dn_action"]);
+                        $run["lastdnsnd"] = time();
+                    }
+                }
+                if ($run['candlePrice']['this'] >= $conf['targetPrice']) {
+                    shell_exec($conf['targetAlert']);
+                }
+                if ($run['candlePrice']['this'] <= $conf['targetPriceLow']) {
+                    shell_exec($conf['targetAlertLow']);
                 }
             }
             echo("Last $mm_check movements (>" . $conf["alertpercent"] . "%): " . $bob . "                               \n");
             echo($add_status);
             if ($out) {
                 // speak and print the alert text
-                shell_exec($this->conf["voice"] . " \"$out\" >/dev/null 2>/dev/null &");
+                if ($conf['voiceOn'] == "on" || $conf['voiceOn'] == "y") {
+                    shell_exec($this->conf["voice"] . " \"$out\" >/dev/null 2>/dev/null &");
+                }
                 echo($out . "\n");
             } else {
                 // else erase previous alert from screen
                 echo(str_repeat(" ", 40));
             }
         }
+
         function exception_handler($exception)
         {
             echo "Uncaught exception: ", $exception->getMessage(), "\n";
@@ -469,7 +529,6 @@ NameSpace jmp0x0000\BinanceBot {
 
 
 // utility functions
-
 
 
 }

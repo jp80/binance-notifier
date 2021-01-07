@@ -5,11 +5,20 @@
     ],
     "ans": "\u001b[",
     "voice": "espeak-ng -a 120 -v en-gb ",
-    "alertpercent": "0.5",
+    "alertpercent": "0.2",
     "alertfreq": "60",
     "alertpc_up_action": "aplay .\/sounds\/smb_1-up.wav >\/dev\/null 2>\/dev\/null &",
     "alertpc_dn_action": "aplay .\/sounds\/smb_pipe.wav >\/dev\/null 2>\/dev\/null &",
     "priceTsMax": 120,
     "lookback_average_mins": 5,
-    "fetchDelay": "1"
+    "fetchDelay": "1",
+    "tradePair": "XRPUSDT",
+    "logFile": "\/tmp\/bot-xrp.log",
+    "errorLog": "\/tmp\/bot-xrp-error.log",
+    "voiceOn": "no",
+    "alertOn": "on",
+    "targetPrice": "0.31",
+    "targetAlert": "aplay .\/sounds\/smb_coin.wav >\/dev\/null 2>\/dev\/null &",
+    "targetPriceLow": "0.24",
+    "targetAlertLow": "aplay .\/sounds\/smb_kick.wav >\/dev\/null 2>\/dev\/null &"
 }
