@@ -1,6 +1,8 @@
 # binance-notifier
 A simple read-only bot for Binance API which announces large volumes and changes in price.
 
+For the latest version, please checkout the oop-php branch that I'm currently working on. It has some issues compared to master. When I have resolved those issues I will merge back into master.
+
 This is a PHP console app.
 
 Requires: larislackers/php-binance
