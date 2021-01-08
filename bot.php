@@ -38,10 +38,10 @@
     {
         public $conf = array();
         public $run = array();
-
         private $char_input = "";
-
         public $api;
+        public $hist = array();
+        public $alerts;
 
         public function formatVolume($text): array
         {
@@ -63,6 +63,21 @@
             return ($r);
         }
 
+        public function isEnabled($what){
+            if (isset($this)) {
+                switch($this->conf[$what]){
+                    case "y":
+                    case "yes":
+                    case "on":
+                    case "1":
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+            return true;
+        }
+
         public function init_conf($confFileName)
         {
             $conf =& $this->conf;
@@ -73,6 +88,7 @@
                 $conf["apiCreds"] = explode(":", file_get_contents('./binance.api'));
                 $conf["ans"] = chr(27) . "[";    // ANSI escape sequence
                 $conf["voice"] = "espeak-ng -a 20 -v en-gb ";//voice synthesis command
+                $conf['sPlay'] = "aplay ";
                 $conf["alertpercent"] = 0.0025;       // how much up/down in percentage to watch for
                 $conf["alertfreq"] = 10;         // alert time and amount
                 // todo: make the percentage alert config an array so we can have different metrics to test against
@@ -107,12 +123,8 @@
             $run["candlePrice"]["prev"] = 0;         // [RT] Holds previous candle price
 
             // TODO: Some of these vars could do with having a $this->rtVars[*] (runtime vars as opposed to config vars)
-        }
 
 
-        public function printconf()
-        {
-            var_dump($this->conf);
         }
 
         public function non_block_read($fd, &$data)
@@ -180,12 +192,12 @@
                         }
                         if (!$ci) {
                             // print on the left
-                            echo(chr(27) . "[" . (4 + $i) . ";22H " . $val . $add . "  ");
+                            echo(chr(27) . "[" . (2 + $i) . ";23H " . $val . $add . "  ");
                             $candlePrice['prev'] = $x[4];
                         }
                         if ($ci) {
                             // print on the right
-                            echo(chr(27) . "[" . (4 + $i) . ";63H " . $val . $add . "  ");
+                            echo(chr(27) . "[" . (2 + $i) . ";57H " . $val . $add . "  ");
                             $candlePrice['this'] = $x[4];
                         }
 
@@ -225,38 +237,49 @@
             $fn[9] = "Taker Buy Vol.";
             $fn[10] = "Taker buy quote vol.";
 
-            echo($ans . "2J" . $ans . "0;0H");        // clear the terminal
-            echo("\n" . str_pad("Last Candle       Trading: " . $this->conf['tradePair'], 41) . "Current Candle\n" . str_repeat("-", 78));        // header text
+            $this->cls();       // clear the terminal
+            echo("-[ previous ]-".str_repeat("-", 20)."-[ current ]--------------------------------");        // header text
             for ($j = 0; $j < 11; $j++) {         // populate field names
-                $i = $j + 4;
-                echo($ans . $i . ";0H" . str_pad($fn[$j], 20) . ":" . $ans . $i . ";42H" . str_pad($fn[$j], 20) . ":\n");
+                $i = $j + 2;
+                echo($ans . $i . ";0H " . str_pad($fn[$j], 20) . ":" . $ans . $i . ";36H" . str_pad($fn[$j], 20) . ":\n");
             }
-            echo($ans . "15;0H" . str_repeat("-", 78));         // draw a line under the fields
+            echo($ans . "13;0H" . str_repeat("-", 78));         // draw a line under the fields
         }
-
 
         public function debug()
         {
 
-            echo(chr(27) . "[2J" . chr(27) . "[0H");
+            $this->cls();
             $exitDebug = false;
             while (!$exitDebug) {
                 echo("\nx to exit, b to go back to bot, h for help\n");
+                if(empty($hist)) {
+                    if (file_exists("./commandHistory.json")) {
+                        $hist = json_decode(file_get_contents("./commandHistory.json"), true);
+                        foreach ($hist as $ory) {
+                            readline_add_history($ory);
+                        }
+                    }
+                }
 
                 $comm = readline();
+                $hist[]=$comm;
+                $fp=fopen("./commandHistory.json",'w');
+                fputs($fp, json_encode($hist, JSON_PRETTY_PRINT));
+                fclose($fp);
                 readline_add_history($comm);
                 if ($comm == "x") exit();
                 if ($comm == "b") $exitDebug = true;
                 if ($comm == "h" || $comm == "?") {
                     echo("set <varname> <value>       - set CONFIG variable\n");
                     echo("pv                          - dump all vars\n");
-                    echo("lrt [<filename>]	      - load runtime vars");
-                    echo("srt [<filename>]	      - save runtime vars");
+                    echo("lrt [<filename>]	          - load runtime vars\n");
+                    echo("srt [<filename>]	          - save runtime vars\n");
                     echo("lconf [<filename>]          - load config <filename> or default\n");
                     echo("sconf [<filename>]          - save config <filename> or default\n");
-                    echo("x			      - save vars and exit\n");
-                    echo("b			      - back to app\n");
-                    echo("h / ?			      - display this help\n");
+                    echo("x			                  - save vars and exit\n");
+                    echo("b			                  - back to app\n");
+                    echo("h / ?			              - display this help\n");
                 }
                 if (substr($comm, 0, 5) == "lconf") {
                     if (stristr($comm, " ")) {
@@ -312,7 +335,7 @@
                     echo("\$this->conf[\"$varname\"] = \"$varval\"\n");
                 }
                 if (substr($comm, 0, 2) == "pv") {
-                    echo(chr(27) . "[2J" . chr(27) . "[0H");
+                    $this->cls();
                     echo("\nRuntime:\n");
                     foreach (array_keys($this->run) as $key) {
                         echo($key . " : " . json_encode($this->run[$key]) . "\n");
@@ -324,6 +347,11 @@
                 }
             }
             $this->displayConstants();
+        }
+
+        public function cls(){
+            $ans =& $this->conf["ans"];
+            echo($ans."2J" . $ans."0H");
         }
 
         public function loadConfig($fn)
@@ -403,7 +431,7 @@
                 $vol_avg = $vol_avg / $lookback_average_mins;
             }
             $out = false;
-            echo($ans . "16;0H");
+          //  echo($ans . "16;0H");
             // alert if value goes up/down by N.NNX
             if (substr($candlePrice['this'], 0, 5) !== $curr_value) {
                 if (substr($candlePrice['this'], 0, 5) < $curr_value) {
@@ -442,16 +470,15 @@
                         $percent_change = $percent_change * -1;
                     } else $percent_change = 0;
                 if ($percent_change > 0 && $percent_change > $conf["alertpercent"]) {
-                    $out = "Up " . number_format((float)$percent_change, 2, '.', '') . "  percent in the last $seconds_elapsed seconds";
+                    $out = $ans . "16;0HUp " . number_format((float)$percent_change, 2, '.', '') . "  percent in the last $seconds_elapsed seconds";
+                    $this->play("targetAlert");
                     $alert["lastPrice"] = $candlePrice["this"];
-                    //$movement['up']++;
                     $move['down'][] = "0";
                     $move['up'][] = "1";
                     $alert['lastCheckTs'] = time();
                 } else if ($percent_change < 0 && abs($percent_change) > $conf["alertpercent"]) {
-                    $out = "Down " . number_format((float)$percent_change, 2, '.', '') . " percent in the last $seconds_elapsed seconds";
-                    $alert["lastPrice"] = $candlePrice["this"];
-                    //$movement['down']++;
+                    $out = $ans. "16;0HDown " . number_format((float)$percent_change, 2, '.', '') . " percent in the last $seconds_elapsed seconds";
+                    $this->play("targetAlertLow");$alert["lastPrice"] = $candlePrice["this"];
                     $move['down'][] = "1";
                     $move['up'][] = "0";
                     $alert['lastCheckTs'] = time();
@@ -464,8 +491,7 @@
             }
             // current status
             $volDisplay = $this->formatVolume($vol_avg);
-            echo("Average volume ($closures): " . $volDisplay['val'] . $volDisplay['add'] . "\n");
-            echo("Current value: \$$curr_value\n");
+            echo($ans."14;0HPair: ".$conf['tradePair']." - Avg Vol ($closures): " . $volDisplay['val'] . $volDisplay['add'] . " - Value: \$$curr_value".$ans."16;0H");
             $mm_check = 5;
             $mCount = count($move['up']);
             if ($mCount < $mm_check) $mm_check = $mCount;
@@ -484,39 +510,40 @@
             }
             $add_status = $lastups;
             $msum = $upc - $dnc;
-            if ($upc > $dnc) $bob = "Up ($upc/$dnc)"; else if ($dnc > $upc) $bob = "Down (" . $dnc . "/$upc)                 "; else $bob = "No movement                      ";
-            if ($conf["alertOn"] == "y" || $conf['alertOn'] == 'on') {
+            if ($upc > $dnc) $bob = "Up ($upc/$dnc)"; else if ($dnc > $upc) $bob = "Down (" . $dnc . "/$upc)"; else $bob = "No movement";
+            if ($this->isEnabled("alertOn")) {
                 if ($upc == 5) {
                     if ((time() - $run["lastupsnd"]) > 60) {
-                        shell_exec($conf["alertpc_up_action"]);
+                        $this->play("alertpc_up_action");
                         $run["lastupsnd"] = time();
                     }
                 }
                 if ($dnc == 5) {
                     if ((time() - $run["lastdnsnd"]) > 60) {
-                        shell_exec($conf["alertpc_dn_action"]);
+                        $this->play("alertpc_dn_action");
                         $run["lastdnsnd"] = time();
                     }
                 }
-                if ($run['candlePrice']['this'] >= $conf['targetPrice']) {
-                    shell_exec($conf['targetAlert']);
-                }
-                if ($run['candlePrice']['this'] <= $conf['targetPriceLow']) {
-                    shell_exec($conf['targetAlertLow']);
-                }
+                if ($run['candlePrice']['this'] >= $conf['targetPrice']) $this->play('targetAlert');
+                if ($run['candlePrice']['this'] <= $conf['targetPriceLow']) $this->play('targetAlertLow');
+
             }
-            echo("Last $mm_check movements (>" . $conf["alertpercent"] . "%): " . $bob . "                               \n");
-            echo($add_status);
+            echo($ans."15;0HLast $mm_check movements (>" . $conf["alertpercent"] . "%): " . $bob);
+            echo($ans."17;0H".$add_status);
+            echo($ans."14;65HTgt H: ".$this->conf["targetPrice"]);
+            echo($ans."15;65HTgt L: ".$this->conf["targetPriceLow"]);
+
             if ($out) {
                 // speak and print the alert text
-                if ($conf['voiceOn'] == "on" || $conf['voiceOn'] == "y") {
+                if ($this->isEnabled("voiceOn")) {
                     shell_exec($this->conf["voice"] . " \"$out\" >/dev/null 2>/dev/null &");
                 }
                 echo($out . "\n");
-            } else {
-                // else erase previous alert from screen
-                echo(str_repeat(" ", 40));
             }
+        }
+
+        public function play($what){
+            shell_exec($this->conf["sPlay"]." ".$this->conf[$what]." >/dev/null 2>/dev/null &");
         }
 
         function exception_handler($exception)
