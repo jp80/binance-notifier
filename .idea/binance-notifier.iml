@@ -24,6 +24,9 @@
       <excludeFolder url="file://$MODULE_DIR$/vendor/react/event-loop" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/react/promise" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/react/promise-timer" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/ringcentral/psr7" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/react/promise-stream" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/react/http" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

@@ -11,8 +11,12 @@
 //// XRP (BEP20) Address: 0xeac9832313c854cf86f8ce79466c76f920a49a31
 
     require('vendor/autoload.php');
-
+require("./AsyncServer.php");
     use \Larislackers\BinanceApi as BApi;
+    use MongoDB\Driver\Server;
+    use \React;
+    use \React\Http;
+    use \Psr;
 
     shell_exec('stty cbreak');
 
@@ -28,6 +32,9 @@
         $bb->init_conf(false);
     }
 
+    $bb->Server=new AsyncServer();
+//$bb->Server->startServer();
+
     $bb->displayConstants();
     $bb->api = new BApi\BinanceApiContainer($bb->conf["apiCreds"][0], $bb->conf["apiCreds"][1]);
     $bb->mainLoop();
@@ -42,6 +49,8 @@
         public $api;
         public $hist = array();
         public $alerts;
+
+        public $Server;
 
         public function formatVolume($text): array
         {
@@ -151,6 +160,7 @@
                     $this->debugvars = get_defined_vars();
                     if ($this->char_input == "d") $this->debug();
                 }
+
                 // current item - 0 = prev candle, 1 = curr candle
                 $ci = 0;
                 // get the candle data from binance
@@ -538,7 +548,7 @@
                 if ($this->isEnabled("voiceOn")) {
                     shell_exec($this->conf["voice"] . " \"$out\" >/dev/null 2>/dev/null &");
                 }
-                echo($out . "\n");
+                echo($ans."16;0H".str_pad($out ,75)."\n");
             }
         }
 
