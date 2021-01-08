@@ -18,7 +18,7 @@
     "errorLog": "\/tmp\/bot-xrp-error.log",
     "voiceOn": "no",
     "alertOn": "on",
-    "targetPrice": "0.35",
+    "targetPrice": "0.34",
     "targetAlert": " .\/sounds\/smb_coin.wav ",
     "targetPriceLow": "0.3075",
     "targetAlertLow": " .\/sounds\/smb_kick.wav "

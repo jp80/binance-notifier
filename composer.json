@@ -2,6 +2,8 @@
     "require": {
         "larislackers/php-binance": "^1.0",
       "ext-json": "*",
-      "ext-readline": "*"
+      "ext-readline": "*",
+      "react/http": "*",
+      "ext-pthreads": "*"
     }
 }
