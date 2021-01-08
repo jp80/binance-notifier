@@ -3,7 +3,6 @@
         "larislackers/php-binance": "^1.0",
       "ext-json": "*",
       "ext-readline": "*",
-      "react/http": "*",
-      "ext-pthreads": "*"
+      "react/http": "*"
     }
 }
