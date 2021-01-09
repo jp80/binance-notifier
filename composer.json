@@ -3,6 +3,7 @@
         "larislackers/php-binance": "^1.0",
       "ext-json": "*",
       "ext-readline": "*",
-      "react/http": "*"
+      "react/http": "*",
+        "noximo/php-colored-ascii-linechart": "^1.1"
     }
 }

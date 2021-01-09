@@ -13,10 +13,7 @@
     require('vendor/autoload.php');
 require("./AsyncServer.php");
     use \Larislackers\BinanceApi as BApi;
-    use MongoDB\Driver\Server;
-    use \React;
-    use \React\Http;
-    use \Psr;
+    use \Exception;
 
     shell_exec('stty cbreak');
 
@@ -94,7 +91,8 @@ require("./AsyncServer.php");
 
             if (!$this->loadConfig($confFileName)) {
 
-                $conf["apiCreds"] = explode(":", file_get_contents('./binance.api'));
+                $conf["apiKey"] = "Insert apiKey here";
+                $conf["apiSec"] = "Insert apiSecret here";
                 $conf["ans"] = chr(27) . "[";    // ANSI escape sequence
                 $conf["voice"] = "espeak-ng -a 20 -v en-gb ";//voice synthesis command
                 $conf['sPlay'] = "aplay ";
@@ -429,6 +427,7 @@ require("./AsyncServer.php");
             // if we don't have much data yet
             if ($run['closures'] < $conf['lookback_average_mins']) {
                 for ($a = 0; $a < $run['closures']; $a++) {
+                    sleep(0);
                     //echo($a);
                     //$vol_avg = $vol_avg + $run['volume_avg_array'][$a];
                 }
@@ -455,6 +454,7 @@ require("./AsyncServer.php");
                         $priceTs = time();
                     }
                 } else {
+                    sleep(0);
                     //do nothing
                 }
                 // curr_value = price at present
@@ -519,7 +519,7 @@ require("./AsyncServer.php");
 //                if ($move['down'][$x] == 1) $dnc++;
             }
             $add_status = $lastups;
-            $msum = $upc - $dnc;
+            //$msum = $upc - $dnc;
             if ($upc > $dnc) $bob = "Up ($upc/$dnc)"; else if ($dnc > $upc) $bob = "Down (" . $dnc . "/$upc)"; else $bob = "No movement";
             if ($this->isEnabled("alertOn")) {
                 if ($upc == 5) {
